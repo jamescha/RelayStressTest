@@ -1,20 +1,46 @@
 package relay.test.runner;
 
-import java.util.Iterator;
+import java.util.ArrayList;
 
 import relay.multicast.client.StressTestClient;
 import relay.pipe.client.StressTestRelayPipe;
 import relay.unicast.server.StressTestServer;
 
 public class StressTestRunner {
-	public static void main(String[] args) throws InterruptedException {
-		if(args.length > 0) {
-			//usage
+	static ArrayList<String> pipePorts = new ArrayList<String>();
+	static Boolean hasPipes = false;
+	
+	public static void main(String[] temp) throws InterruptedException {
+		String[] args = {"--pipes","9090","9091","9092","9093"};
+		if(args.length == 0) {
 		} else {
-			for (int i = 0; i < args.length; i++) {
+			loop: for (int i = 0; i < args.length; i++) {
 				switch (args[i]) {
-					
+					case "--help":
+						break loop;
+					case "--pipes":
+						pipePorts.add("--ports");
+						i++;
+						while (i < args.length) {
+							try {
+								Integer.parseInt(args[i]);
+								pipePorts.add(args[i]);
+								i++;
+							} catch (NumberFormatException e) {
+								break;
+							}
+						}
+					hasPipes = true;
+					break;
 				}
+			}
+			
+			if(hasPipes) {
+				System.out.println(pipePorts.size());
+				String[] pipePortsArray = new String[pipePorts.size()];
+				pipePortsArray = pipePorts.toArray(pipePortsArray);
+				System.out.println(pipePortsArray.length);
+				StressTestRelayPipe.main(pipePortsArray);
 			}
 		}
 	}

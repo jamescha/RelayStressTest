@@ -66,15 +66,14 @@ public class StressTestRelayPipe {
 	
 	
 	public static void main(String[] args) {
+		System.out.println(args.length);
 		
-		String[] test = {"--ports","9090","9092"};
-		
-		if (test.length > 0) {
-			switch (test[0]) {
+		if (args.length > 0) {
+			switch (args[0]) {
 			case "--ports":
-				StressTestRelayPipe stressTestRelayPipe = new StressTestRelayPipe(Integer.parseInt(test[1]));
-				for (int i=2; i < test.length; i++) {
-					stressTestRelayPipe.addPipe(Integer.parseInt(test[i]));
+				StressTestRelayPipe stressTestRelayPipe = new StressTestRelayPipe(Integer.parseInt(args[1]));
+				for (int i=2; i < args.length; i++) {
+					stressTestRelayPipe.addPipe(Integer.parseInt(args[i]));
 				}
 				stressTestRelayPipe.startRefreshLoop();
 				break;
