@@ -15,22 +15,22 @@ public class StressTestRelayPipe {
 	static String token;
 	RelayConfiguation relayConfig;
 	
-	public StressTestRelayPipe(int port) {
+	public StressTestRelayPipe(int multiPort, int port) {
 		Configuration.ZMQ config = new Configuration.ZMQ();
 		relayC = new ZeroMQRelayClient(config);
 		config.port = 8042;
 		relayConfig = new RelayConfiguation(
-		          HostAndPort.fromParts("234.0.0.1", 1234),
+		          HostAndPort.fromParts("234.0.0.1", multiPort),
 		          HostAndPort.fromParts("127.0.0.1", port),
 		          6000);
 		token = relayC.addRelay(relayConfig);
 		relayConfig.setGroup(token);
 	}
 	
-	public void addPipe (int port) {
+	public void addPipe (int multiPort, int port) {
 		
 		relayConfig.setDestinationPort(port);
-		
+		relayConfig.setSourcePort(multiPort);
 	    relayC.addRelay(relayConfig);
 	}
 	
@@ -71,9 +71,9 @@ public class StressTestRelayPipe {
 		if (args.length > 0) {
 			switch (args[0]) {
 			case "--ports":
-				StressTestRelayPipe stressTestRelayPipe = new StressTestRelayPipe(Integer.parseInt(args[1]));
-				for (int i=2; i < args.length; i++) {
-					stressTestRelayPipe.addPipe(Integer.parseInt(args[i]));
+				StressTestRelayPipe stressTestRelayPipe = new StressTestRelayPipe(Integer.parseInt(args[1]),Integer.parseInt(args[2]));
+				for (int i=3; i < args.length; i+=2) {
+					stressTestRelayPipe.addPipe(Integer.parseInt(args[i]),Integer.parseInt(args[i+1]));
 				}
 				stressTestRelayPipe.startRefreshLoop();
 				break;
@@ -81,7 +81,7 @@ public class StressTestRelayPipe {
 				break;
 			}
 		} else {
-			System.err.println("usage StressTestRelayPipe portnumbers Example StressTestRelayPipe 9090 9091 9092");
+			System.err.println("usage StressTestRelayPipe sourcePort destinationPort Example StressTestRelayPipe 1234 9090 1235 9091 1236 9092");
 		}
 	}
 }
