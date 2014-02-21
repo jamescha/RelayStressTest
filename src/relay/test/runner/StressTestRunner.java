@@ -1,6 +1,7 @@
 package relay.test.runner;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 
 import relay.multicast.client.StressTestClient;
 import relay.pipe.client.StressTestRelayPipe;
@@ -12,97 +13,107 @@ public class StressTestRunner {
 	static ArrayList<String> multicastPorts = new ArrayList<String>();
 	
 	static Boolean hasPipes = false;
-	static Boolean hasUnicast = false;
 	static Boolean hasMulticast = false;
-	static Boolean latency = false;
+	static Boolean getlatency = false;
+	static Boolean getHelp = false;
 	
-	public static void main(String[] temp) throws InterruptedException {
-		String[] args = {"--pipes","1234","9090","1235","9091","1236","9092","1237","9093"};
+	static HashMap<Integer, Latency> latencys = new HashMap<Integer, Latency>();
+ 	
+	public static void main(String[] args) throws InterruptedException {
 		if(args.length == 0) {
 		} else {
 			loop: for (int i = 0; i < args.length; i++) {
 				switch (args[i]) {
 					case "--help":
+						getHelp = true;
 						break loop;
 					case "--pipes":
 						hasPipes = true;
 						pipePorts.add("--ports");
-						unicastPorts.add("--ports");
-						multicastPorts.add("--ports");
 						i++;
-						while (i < args.length) {
-							try {
-								Integer.parseInt(args[i]);
-								pipePorts.add(args[i]);
-								pipePorts.add(args[i+1]);
-								multicastPorts.add(args[i]);
-								unicastPorts.add(args[i+1]);
-								i+=2;
-							} catch (NumberFormatException e) {
-								break;
+						if(Integer.parseInt(args[i]) > 0){
+							Integer multiPort = 1234;
+							Integer uniPort = 9090;
+							multicastPorts.add(Integer.toString(multiPort));
+							for( int j = 0; j < Integer.parseInt(args[i]); j++ ) {
+								Latency temps = new Latency();
+								unicastPorts.add(Integer.toString(uniPort));
+								latencys.put(uniPort, temps);
+								pipePorts.add(Integer.toString(multiPort));
+								pipePorts.add(Integer.toString(uniPort));
+								uniPort++;
 							}
 						}
 					break;
-					case "--unicast":
-						hasUnicast = true;
-						unicastPorts.add("--ports");
-						i++;
-						while (i<args.length) {
-							try {
-								Integer.parseInt(args[i]);
-								unicastPorts.add(args[i]);
-								i++;
-							} catch (NumberFormatException e) {
-								break;
-							}
-						}
-						break;
 					case "--multicast":
 						hasMulticast = true;
-						multicastPorts.add("--ports");
 						i++;
-						while (i<args.length) {
-							try {
-								Integer.parseInt(args[i]);
-								multicastPorts.add(args[i]);
-								i++;
-							} catch (NumberFormatException e) {
-								break;
+						if(Integer.parseInt(args[i]) > 0) {
+							Integer multiPort = 1234;
+							for(int j = 0; j < Integer.parseInt(args[i])-1; j++) {
+								multicastPorts.add(Integer.toString(multiPort));
 							}
 						}
 						break;
 					case "--latency":
-						latency=true;
+						getlatency=true;
 					break;
 				}
 			}
+			if(!getHelp)
+			{
+				if(hasPipes) {
+					String[] pipePortsArray = new String[pipePorts.size()];
+					String[] uniPortsArray = new String[unicastPorts.size()];
+					pipePortsArray = pipePorts.toArray(pipePortsArray);
+					uniPortsArray = unicastPorts.toArray(uniPortsArray);
+					if(getlatency) {
+						StressTestRelayPipe.main(pipePortsArray);
+						StressTestServer.main(uniPortsArray, latencys);
+					} else {
+						StressTestRelayPipe.main(pipePortsArray);
+						StressTestServer.main(uniPortsArray);
+					}
+				} else { //Default to increasing in size every 2 seconds
+					(new Thread(new IncrementUpByOnePipe())).start();
+				}
+				
+				if(hasMulticast) {
+					String[] multiPortsArray = new String[multicastPorts.size()];
+					multiPortsArray = multicastPorts.toArray(multiPortsArray);
+					if(getlatency) {
+						StressTestClient.main(multiPortsArray, latencys);
+					} else {
+						StressTestClient.main(multiPortsArray);
+					}
+					
+				} else {
+					(new Thread(new IncrementUpByOneMulticast())).start();
+				}
+			}
 			
-			if(hasPipes) {
-				System.out.println(pipePorts.size());
-				String[] pipePortsArray = new String[pipePorts.size()];
-				pipePortsArray = pipePorts.toArray(pipePortsArray);
-				System.out.println(pipePortsArray.length);
-				StressTestRelayPipe.main(pipePortsArray);
-			} else { //Default to increasing in size
-				(new Thread(new incrementUpByOnePipe())).start();
+			if (getlatency) {
+				(new Thread(new RunningAverage())).start();
 			}
 		}
 	}
 	
-	private static class incrementUpByOnePipe implements Runnable {
-		Integer ports = 9090;
+	private static class IncrementUpByOnePipe implements Runnable {
+		Integer uniPort = 9090;
+		Integer multiPort = 1234;
 		String[] pipePortsArray = new String[1];
 		ArrayList<String> pipeList = new ArrayList<String>();
-		
-		public incrementUpByOnePipe() {
-			pipeList.add(Integer.toString(ports));
-		}
+		StressTestRelayPipe pipe = new StressTestRelayPipe(multiPort, uniPort);
 		
 		@Override
 		public void run() {
+			pipe.startRefreshLoop();
+			pipeList.add(Integer.toString(uniPort));
 			while(true) {
 				pipePortsArray = pipeList.toArray(pipePortsArray);
-				pipeList.set(0, Integer.toString(ports++));
+				pipe.main(pipePortsArray);
+				pipe.addPipe(multiPort++, uniPort++);
+				pipeList.set(0, Integer.toString(uniPort));
 				try {
 					Thread.sleep(2000);
 				} catch (InterruptedException e) {
@@ -113,48 +124,83 @@ public class StressTestRunner {
 		}
 	}
 	
-	private static class incrementUpByOneMulticast implements Runnable {
+	private static class IncrementUpByOneMulticast implements Runnable {
 		
-		Integer ports = 1234;
+		Integer numberOfPorts = 0;
+		
 		String[] multicastPortsArray = new String [1];
 		ArrayList<String> multicastPorts = new ArrayList<String>();
-		public incrementUpByOneMulticast() {
-			multicastPorts.add(Integer.toString(ports));
+		
+		
+		public IncrementUpByOneMulticast() {
+			multicastPorts.add(Integer.toString(1234));
 		}
 		
 		@Override
 		public void run() {
-			multicastPortsArray =  multicastPorts.toArray(multicastPortsArray);
-			multicastPorts.set(0, Integer.toString(ports++));
-			try {
-				Thread.sleep(1000);
-			} catch (InterruptedException e) {
-				e.printStackTrace();
+			while(true) {
+				numberOfPorts++;
+				
+				System.out.println("Multicast count: " + numberOfPorts);
+				
+				multicastPortsArray =  multicastPorts.toArray(multicastPortsArray);
+				if (getlatency) {
+					StressTestClient.main(multicastPortsArray, latencys);
+				} else {
+					StressTestClient.main(multicastPortsArray);
+				}
+				
+				multicastPorts.set(0, Integer.toString(1234));
+				try {
+					Thread.sleep(1000);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
 			}
 		}
-		
 	}
 	
-	private static void someTest() throws InterruptedException {
-		StressTestClient stressTestClient = new StressTestClient();
-		//String[] ports = {"9090","9091","9092","9093","9094","9095","9096","9097","9098","9099"};
-		String[] ports = new String[1];
-		/*for (int i = 0; i < 100; i++) {
-			ports[i] = Integer.toString(9090+i);
-		}*/
-		Integer number = 9090;
+	private static class RunningAverage implements Runnable {
+		private Long average = new Long (0);
+		private Long sum = new Long(0);
+		private Long count = new Long(0);
 		
-		while(true) {
-			ports[0] = (number).toString();
-			number++;
-			StressTestServer.main(ports);
-			StressTestRelayPipe.main(ports);
-			stressTestClient.run();
+		public Long getCount() {
+			return count;
+		}
+		
+		public Long getSum() {
+			return sum;
+		}
+
+		public Long getAverage() {
+			return average;
+		}
+		
+		public void setAverage(Long average) {
+			this.average = average;
+		}
+
+		@Override
+		public void run() {
 			
-			Thread.sleep(1000);
+			while(true) {
+
+				try {
+					Thread.sleep(5000);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+				
+				for (Latency latency : latencys.values()) {
+					sum += latency.getLatency();
+					count += latency.getCount();
+				}
+				
+				setAverage(getSum()/getCount());
+				
+				System.out.println("Average Latency: " + getAverage());
+			}
 		}
 	}
-	
-	
-	
 }

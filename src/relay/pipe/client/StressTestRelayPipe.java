@@ -2,10 +2,8 @@ package relay.pipe.client;
 
 import java.io.IOException;
 
-import com.google.common.base.CaseFormat;
 import com.google.common.net.HostAndPort;
 import com.pelco.stargate.application.Configuration;
-import com.pelco.stargate.relay.client.MessageTypes.Params;
 import com.pelco.stargate.relay.client.MessageTypes.RelayConfiguation;
 import com.pelco.stargate.relay.client.ZeroMQRelayClient;
 
@@ -64,9 +62,7 @@ public class StressTestRelayPipe {
 		}
 	}
 	
-	
 	public static void main(String[] args) {
-		System.out.println(args.length);
 		
 		if (args.length > 0) {
 			switch (args[0]) {
